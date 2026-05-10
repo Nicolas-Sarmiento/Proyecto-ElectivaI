@@ -18,3 +18,20 @@ class Config:
         f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+    # Almacenamiento de archivos PDF
+    UPLOAD_FOLDER = os.path.join(os.path.abspath(os.path.dirname(__file__)), "uploads")
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB
+    ALLOWED_EXTENSIONS = {"pdf"}
+
+    # Keycloak — validación de Bearer tokens
+    KEYCLOAK_URL = os.getenv("KEYCLOAK_URL", "http://localhost:8080")
+    KEYCLOAK_REALM = os.getenv("KEYCLOAK_REALM", "editorial")
+    KEYCLOAK_CLIENT_ID = os.getenv("KEYCLOAK_CLIENT_ID", "editorial-backend")
+    KEYCLOAK_CLIENT_SECRET = os.getenv("KEYCLOAK_CLIENT_SECRET", "")
+
+    @classmethod
+    def keycloak_jwks_uri(cls) -> str:
+        """URI del endpoint JWKS de Keycloak para obtener claves públicas."""
+        return f"{cls.KEYCLOAK_URL}/realms/{cls.KEYCLOAK_REALM}/protocol/openid-connect/certs"
+
