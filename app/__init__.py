@@ -17,6 +17,10 @@ def create_app(config_class=Config):
 
     # Registra blueprints
     app.register_blueprint(bp, url_prefix="/api")
+    
+    # Inicializa colección Weaviate
+    from app.weaviate_client import inicializar_weaviate
+    inicializar_weaviate(app)
 
     @app.get("/health")
     def health_check():

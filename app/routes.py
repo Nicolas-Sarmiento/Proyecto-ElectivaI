@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 
-from app.models import Organization, PublicationType, db
+from app.models import Organization, PublicationType, Publication, db
+from app.weaviate_client import guardar_publicacion, buscar_publicaciones
 
 bp = Blueprint("main", __name__)
 
@@ -92,3 +93,46 @@ def delete_publication_type(type_id):
     db.session.delete(pub_type)
     db.session.commit()
     return jsonify({"message": "Tipo de publicación eliminado correctamente."}), 200
+
+
+# ─── Publications & Weaviate Search ────────────────────────────────────────────
+
+@bp.route("/publications", methods=["POST"])
+def create_publication():
+    """Crea una nueva publicación en Postgres y la sincroniza con Weaviate."""
+    data = request.get_json()
+    if not data or not data.get("title"):
+        return jsonify({"error": "El campo 'title' es requerido."}), 400
+
+    # Crear en PostgreSQL
+    pub = Publication(
+        title=data["title"],
+        resource_url=data.get("resource_url"),
+        keywords=data.get("keywords", [])
+    )
+    db.session.add(pub)
+    db.session.commit()
+    
+    # Sincronizar hacia Weaviate (Vector + BM25 index)
+    guardar_publicacion(
+        publication_id=pub.publication_id,
+        title=pub.title,
+        resource_url=pub.resource_url,
+        keywords=pub.keywords
+    )
+    
+    return jsonify(pub.to_dict()), 201
+
+
+@bp.route("/publications/search", methods=["GET"])
+def search_publications():
+    """Busca publicaciones usando Weaviate (Hybrid Search)."""
+    query = request.args.get("q")
+    if not query:
+        return jsonify({"error": "Debes proporcionar el parámetro 'q'."}), 400
+        
+    limite = request.args.get("limit", 5, type=int)
+    
+    resultados = buscar_publicaciones(query=query, limite=limite)
+    return jsonify(resultados), 200
+
