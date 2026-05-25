@@ -35,3 +35,11 @@ class Config:
         """URI del endpoint JWKS de Keycloak para obtener claves públicas."""
         return f"{cls.KEYCLOAK_URL}/realms/{cls.KEYCLOAK_REALM}/protocol/openid-connect/certs"
 
+    # Embeddings — modelo local con sentence-transformers
+    EMBEDDING_MODEL = os.getenv(
+        "EMBEDDING_MODEL",
+        "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    )
+    EMBEDDING_DIMENSION = 384
+    CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "500"))
+    CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "100"))

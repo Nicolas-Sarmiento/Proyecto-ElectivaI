@@ -264,7 +264,8 @@ def create_publication():
     upload_folder = ensure_upload_folder()
     original_name = secure_filename(file.filename)
     unique_filename = f"{uuid_lib.uuid4()}_{original_name}"
-    file.save(os.path.join(upload_folder, unique_filename))
+    pdf_path = os.path.join(upload_folder, unique_filename)
+    file.save(pdf_path)
 
     # Parsear fecha si se envía
     publish_date = None
@@ -292,6 +293,18 @@ def create_publication():
 
     db.session.add(pub)
     db.session.commit()
+
+    # Generar embeddings del PDF en segundo plano (síncrono por ahora)
+    try:
+        from app.embeddings import process_pdf_for_publication
+        chunks_count = process_pdf_for_publication(pub.publication_id, pdf_path)
+        current_app.logger.info(
+            "Publicación '%s' creada con %d chunks indexados.", title, chunks_count
+        )
+    except Exception as e:
+        current_app.logger.error("Error generando embeddings: %s", e)
+        # La publicación se crea igualmente, solo sin búsqueda semántica
+
     return jsonify(pub.to_dict()), 201
 
 
@@ -346,8 +359,17 @@ def update_publication(pub_id):
 
             upload_folder = ensure_upload_folder()
             unique_filename = f"{uuid_lib.uuid4()}_{secure_filename(file.filename)}"
-            file.save(os.path.join(upload_folder, unique_filename))
+            pdf_path = os.path.join(upload_folder, unique_filename)
+            file.save(pdf_path)
             pub.resource_url = unique_filename
+
+            # Regenerar embeddings para el nuevo PDF
+            try:
+                from app.embeddings import delete_chunks_for_publication, process_pdf_for_publication
+                delete_chunks_for_publication(pub.publication_id)
+                process_pdf_for_publication(pub.publication_id, pdf_path)
+            except Exception as e:
+                current_app.logger.error("Error regenerando embeddings: %s", e)
 
     db.session.commit()
     return jsonify(pub.to_dict()), 200
@@ -365,6 +387,7 @@ def delete_publication(pub_id):
         if os.path.exists(file_path):
             os.remove(file_path)
 
+    # Los chunks se eliminan automáticamente por CASCADE
     db.session.delete(pub)
     db.session.commit()
     return jsonify({"message": "Publicación eliminada correctamente."}), 200
@@ -383,3 +406,28 @@ def download_publication_file(pub_id):
         as_attachment=True,
         download_name=pub.resource_url.split("_", 1)[-1],  # Nombre original sin el UUID
     )
+
+
+# ─── Búsqueda Semántica (Lenguaje Natural) ───────────────────────────────────
+
+@bp.route("/search", methods=["GET"])
+def search_publications():
+    """
+    Búsqueda por lenguaje natural usando embeddings y pgvector.
+    Query params:
+        q     (str, requerido): Consulta en lenguaje natural.
+        limit (int, opcional):  Número máximo de resultados (default 10).
+    """
+    query = request.args.get("q", "").strip()
+    if not query:
+        return jsonify({"error": "El parámetro 'q' es requerido."}), 400
+
+    limit = request.args.get("limit", 10, type=int)
+
+    try:
+        from app.embeddings import semantic_search
+        results = semantic_search(query, limit=limit)
+        return jsonify(results), 200
+    except Exception as e:
+        current_app.logger.error("Error en búsqueda semántica: %s", e)
+        return jsonify({"error": "Error al realizar la búsqueda semántica."}), 500

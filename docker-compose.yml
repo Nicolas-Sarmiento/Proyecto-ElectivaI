@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: editorial_db
     restart: always
     environment:
@@ -23,6 +23,7 @@ services:
       - "5050:80"
     depends_on:
       - postgres
+
 
 volumes:
   postgres_data:

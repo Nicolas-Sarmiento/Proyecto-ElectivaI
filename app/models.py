@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, timezone
 
 from flask_sqlalchemy import SQLAlchemy
+from pgvector.sqlalchemy import Vector
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
 
 db = SQLAlchemy()
@@ -172,6 +173,14 @@ class Publication(db.Model):
         lazy="select",
     )
 
+    # Relación 1:N con DocumentChunk (los chunks se eliminan en cascada)
+    chunks = db.relationship(
+        "DocumentChunk",
+        back_populates="publication",
+        lazy="dynamic",
+        cascade="all, delete-orphan",
+    )
+
     def to_dict(self):
         return {
             "publication_id": str(self.publication_id),
@@ -189,3 +198,43 @@ class Publication(db.Model):
 
     def __repr__(self):
         return f"<Publication {self.title}>"
+
+
+class DocumentChunk(db.Model):
+    """
+    Fragmento de texto extraído de un PDF con su embedding.
+    Se usa para búsqueda semántica por lenguaje natural con pgvector.
+    """
+
+    __tablename__ = "document_chunks"
+
+    chunk_id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    publication_id = db.Column(
+        UUID(as_uuid=True),
+        db.ForeignKey("publications.publication_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    page_number = db.Column(db.Integer, nullable=False)
+    chunk_index = db.Column(db.Integer, nullable=False)
+    text_content = db.Column(db.Text, nullable=False)
+    embedding = db.Column(Vector(384), nullable=False)
+
+    created_at = db.Column(
+        db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+    # Relación inversa a Publication
+    publication = db.relationship("Publication", back_populates="chunks")
+
+    def to_dict(self):
+        return {
+            "chunk_id": str(self.chunk_id),
+            "publication_id": str(self.publication_id),
+            "page_number": self.page_number,
+            "chunk_index": self.chunk_index,
+            "text_content": self.text_content,
+        }
+
+    def __repr__(self):
+        return f"<DocumentChunk pub={self.publication_id} p{self.page_number} c{self.chunk_index}>"
