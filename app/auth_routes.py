@@ -69,6 +69,62 @@ def _get_admin_token() -> str | None:
     return None
 
 
+# ─── Registro ─────────────────────────────────────────────────────────────────
+
+@auth_bp.route("/register", methods=["POST"])
+def register():
+    """
+    Registra un nuevo usuario en Keycloak.
+    
+    Body JSON:
+        username (str, requerido)
+        password (str, requerido)
+        email    (str, opcional)
+        first_name (str, opcional)
+        last_name  (str, opcional)
+    """
+    data = request.get_json()
+    if not data or not data.get("username") or not data.get("password"):
+        return jsonify({"error": "Los campos 'username' y 'password' son requeridos."}), 400
+
+    admin_token = _get_admin_token()
+    if not admin_token:
+        return jsonify({"error": "Error interno: no se pudo obtener permisos de administración."}), 503
+
+    users_url = f"{current_app.config['KEYCLOAK_URL']}/admin/realms/{current_app.config['KEYCLOAK_REALM']}/users"
+    
+    try:
+        resp = requests.post(
+            users_url,
+            json={
+                "username": data["username"],
+                "email": data.get("email"),
+                "firstName": data.get("first_name"),
+                "lastName": data.get("last_name"),
+                "enabled": True,
+                "credentials": [{
+                    "type": "password",
+                    "value": data["password"],
+                    "temporary": False
+                }]
+            },
+            headers={"Authorization": f"Bearer {admin_token}"},
+            timeout=10,
+        )
+    except requests.RequestException as e:
+        logger.error("Error al registrar usuario: %s", e)
+        return jsonify({"error": "No se pudo conectar con el servicio de autenticación."}), 503
+
+    if resp.status_code == 409:
+        return jsonify({"error": "El nombre de usuario o correo ya existe."}), 409
+        
+    if not resp.ok and resp.status_code != 201:
+        logger.error("Error al registrar usuario %s: %s", resp.status_code, resp.text)
+        return jsonify({"error": "No se pudo registrar el usuario."}), 400
+
+    return jsonify({"message": "Usuario registrado exitosamente."}), 201
+
+
 # ─── Login ────────────────────────────────────────────────────────────────────
 
 @auth_bp.route("/login", methods=["POST"])
@@ -267,15 +323,16 @@ def me():
     No hace ninguna llamada adicional a Keycloak.
     """
     user = get_current_user()
+    logger.warning(f"DEBUG GET_ME: user={user.get('preferred_username')} roles={user.get('realm_access')} {user.get('resource_access')}")
     return jsonify({
         "id": user.get("sub"),
         "username": user.get("preferred_username"),
         "email": user.get("email"),
         "first_name": user.get("given_name"),
         "last_name": user.get("family_name"),
-        "roles": (
-            user.get("resource_access", {})
+        "roles": list(set(
+            (user.get("resource_access", {})
             .get(current_app.config["KEYCLOAK_CLIENT_ID"], {})
-            .get("roles", [])
-        ),
+            .get("roles", [])) + (user.get("realm_access", {}).get("roles", []))
+        )),
     }), 200

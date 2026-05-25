@@ -91,6 +91,27 @@ export async function login(
   }
 }
 
+export async function registerUser(
+  data: { username: string; password: string; email?: string; first_name?: string; last_name?: string }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const resp = await fetch(`${API_BASE}/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+
+    const resData = await resp.json();
+
+    if (resp.ok) {
+      return { success: true };
+    }
+    return { success: false, error: resData.error || "Error de registro" };
+  } catch {
+    return { success: false, error: "No se pudo conectar con el servidor" };
+  }
+}
+
 export async function logout(): Promise<void> {
   const refresh = getRefreshToken();
   if (refresh) {
@@ -164,8 +185,16 @@ export interface PublicationType {
 // ─── Publications ────────────────────────────────────────────────────────────
 
 export async function getPublications(keyword?: string): Promise<Publication[]> {
-  const params = keyword ? `?keyword=${encodeURIComponent(keyword)}` : "";
+  const params = keyword 
+    ? `?${keyword.split(',').map(k => `keyword=${encodeURIComponent(k.trim())}`).filter(k => k !== 'keyword=').join('&')}` 
+    : "";
   const resp = await apiFetch(`/publications${params}`);
+  if (resp.ok) return resp.json();
+  return [];
+}
+
+export async function getPublicationsByAuthor(authorId: string): Promise<Publication[]> {
+  const resp = await apiFetch(`/publications?author_id=${authorId}`);
   if (resp.ok) return resp.json();
   return [];
 }
@@ -177,23 +206,41 @@ export async function getPublication(id: string): Promise<Publication | null> {
 }
 
 export async function createPublication(formData: FormData): Promise<{ ok: boolean; data?: Publication; error?: string }> {
-  const resp = await apiFetch("/publications", {
-    method: "POST",
-    body: formData,
-  });
-  const data = await resp.json();
-  if (resp.ok) return { ok: true, data };
-  return { ok: false, error: data.error || "Error al crear la publicación" };
+  try {
+    const resp = await apiFetch("/publications", {
+      method: "POST",
+      body: formData,
+    });
+    
+    if (resp.status === 413) {
+      return { ok: false, error: "El archivo es demasiado grande. El límite es 100 MB." };
+    }
+
+    const data = await resp.json();
+    if (resp.ok) return { ok: true, data };
+    return { ok: false, error: data.error || "Error al crear la publicación" };
+  } catch (e) {
+    return { ok: false, error: "Ocurrió un error inesperado al enviar el archivo." };
+  }
 }
 
 export async function updatePublication(id: string, formData: FormData): Promise<{ ok: boolean; data?: Publication; error?: string }> {
-  const resp = await apiFetch(`/publications/${id}`, {
-    method: "PUT",
-    body: formData,
-  });
-  const data = await resp.json();
-  if (resp.ok) return { ok: true, data };
-  return { ok: false, error: data.error || "Error al actualizar" };
+  try {
+    const resp = await apiFetch(`/publications/${id}`, {
+      method: "PUT",
+      body: formData,
+    });
+    
+    if (resp.status === 413) {
+      return { ok: false, error: "El archivo es demasiado grande. El límite es 100 MB." };
+    }
+
+    const data = await resp.json();
+    if (resp.ok) return { ok: true, data };
+    return { ok: false, error: data.error || "Error al actualizar" };
+  } catch (e) {
+    return { ok: false, error: "Ocurrió un error inesperado al enviar el archivo." };
+  }
 }
 
 export async function deletePublication(id: string): Promise<boolean> {
@@ -222,10 +269,87 @@ export async function getAuthors(): Promise<Author[]> {
   return [];
 }
 
+export async function createAuthor(data: { first_name: string; last_name: string; country?: string; orcid_url?: string; organization_id?: string }): Promise<{ ok: boolean; data?: Author; error?: string }> {
+  const resp = await apiFetch("/authors", {
+    method: "POST",
+    body: JSON.stringify(data)
+  });
+  const resData = await resp.json();
+  if (resp.ok) return { ok: true, data: resData };
+  return { ok: false, error: resData.error || "Error al crear autor" };
+}
+
+export async function updateAuthor(id: string, data: Partial<Author>): Promise<{ ok: boolean; data?: Author; error?: string }> {
+  const resp = await apiFetch(`/authors/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data)
+  });
+  const resData = await resp.json();
+  if (resp.ok) return { ok: true, data: resData };
+  return { ok: false, error: resData.error || "Error al actualizar autor" };
+}
+
 // ─── Publication Types ───────────────────────────────────────────────────────
 
 export async function getPublicationTypes(): Promise<PublicationType[]> {
   const resp = await apiFetch("/publication-types");
   if (resp.ok) return resp.json();
   return [];
+}
+
+export async function createPublicationType(data: { type_name: string }): Promise<{ ok: boolean; data?: PublicationType; error?: string }> {
+  const resp = await apiFetch("/publication-types", {
+    method: "POST",
+    body: JSON.stringify(data)
+  });
+  const resData = await resp.json();
+  if (resp.ok) return { ok: true, data: resData };
+  return { ok: false, error: resData.error || "Error al crear tipo de publicación" };
+}
+
+// ─── Organizations ───────────────────────────────────────────────────────────
+
+export interface Organization {
+  organization_id: string;
+  name: string;
+  website?: string;
+  country?: string;
+  description?: string;
+  created_at: string | null;
+}
+
+export async function getOrganizations(): Promise<Organization[]> {
+  const resp = await apiFetch("/organizations");
+  if (resp.ok) return resp.json();
+  return [];
+}
+
+export async function createOrganization(data: { name: string; website?: string; country?: string; description?: string }): Promise<{ ok: boolean; data?: Organization; error?: string }> {
+  const resp = await apiFetch("/organizations", {
+    method: "POST",
+    body: JSON.stringify(data)
+  });
+  const resData = await resp.json();
+  if (resp.ok) return { ok: true, data: resData };
+  return { ok: false, error: resData.error || "Error al crear organización" };
+}
+
+export async function updateOrganization(id: string, data: { name?: string; website?: string; country?: string; description?: string }): Promise<{ ok: boolean; data?: Organization; error?: string }> {
+  const resp = await apiFetch(`/organizations/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data)
+  });
+  const resData = await resp.json();
+  if (resp.ok) return { ok: true, data: resData };
+  return { ok: false, error: resData.error || "Error al actualizar organización" };
+}
+
+export async function deleteOrganization(id: string): Promise<boolean> {
+  const resp = await apiFetch(`/organizations/${id}`, { method: "DELETE" });
+  return resp.ok;
+}
+
+export async function deleteAuthor(id: string): Promise<boolean> {
+  const resp = await apiFetch(`/authors/${id}`, { method: "DELETE" });
+  return resp.ok;
 }

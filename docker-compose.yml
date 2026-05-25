@@ -24,6 +24,22 @@ services:
     depends_on:
       - postgres
 
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.4
+    container_name: editorial_keycloak
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/editorial_db
+      KC_DB_USERNAME: editorial_user
+      KC_DB_PASSWORD: editorial_pass
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    command: start-dev
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+
 
 volumes:
   postgres_data:

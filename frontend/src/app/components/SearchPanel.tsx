@@ -144,7 +144,7 @@ export function SearchPanel({
               value={keywordQuery}
               onChange={(e) => setKeywordQuery(e.target.value)}
               onKeyDown={handleKeywordKeyDown}
-              placeholder="Buscar por palabra clave exacta... Ej: 'machine learning'"
+              placeholder="Buscar por palabras clave... Ej: 'machine learning, IA'"
               className="w-full pl-12 pr-24 py-3.5 border border-blue-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400 bg-blue-50/30 text-slate-800 placeholder-slate-400 transition-all"
             />
             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">

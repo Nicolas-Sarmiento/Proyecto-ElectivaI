@@ -63,8 +63,7 @@ def _decode_token(token: str) -> dict:
         token,
         signing_key.key,
         algorithms=["RS256"],
-        audience=current_app.config["KEYCLOAK_CLIENT_ID"],
-        options={"verify_exp": True},
+        options={"verify_exp": True, "verify_aud": False},
     )
     return payload
 

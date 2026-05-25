@@ -44,10 +44,13 @@ def extract_text_from_pdf(pdf_path: str) -> list[dict]:
         page = doc[page_num]
         text = page.get_text()
         if text.strip():
-            pages.append({
-                "page_number": page_num + 1,
-                "text": text.strip(),
-            })
+            # Eliminar caracteres NUL para evitar errores en PostgreSQL
+            cleaned_text = text.replace("\x00", "").strip()
+            if cleaned_text:
+                pages.append({
+                    "page_number": page_num + 1,
+                    "text": cleaned_text,
+                })
     doc.close()
     return pages
 

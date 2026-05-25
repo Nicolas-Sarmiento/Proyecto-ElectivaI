@@ -4,9 +4,10 @@ import { login } from '../services/api';
 
 interface LoginFormProps {
   onLoginSuccess: () => void;
+  onGoToRegister: () => void;
 }
 
-export function LoginForm({ onLoginSuccess }: LoginFormProps) {
+export function LoginForm({ onLoginSuccess, onGoToRegister }: LoginFormProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -108,6 +109,15 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
               )}
             </button>
           </form>
+
+          <div className="mt-6 text-center">
+            <button
+              onClick={onGoToRegister}
+              className="text-blue-200/70 hover:text-white text-sm transition-colors"
+            >
+              ¿No tienes cuenta? Regístrate aquí
+            </button>
+          </div>
         </div>
 
         {/* Footer */}

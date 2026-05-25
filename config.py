@@ -21,7 +21,7 @@ class Config:
 
     # Almacenamiento de archivos PDF
     UPLOAD_FOLDER = os.path.join(os.path.abspath(os.path.dirname(__file__)), "uploads")
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB
+    MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100 MB
     ALLOWED_EXTENSIONS = {"pdf"}
 
     # Keycloak — validación de Bearer tokens

@@ -17,6 +17,10 @@ class Organization(db.Model):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     name = db.Column(db.String(255), nullable=False, unique=True)
+    website = db.Column(db.String(255), nullable=True)
+    country = db.Column(db.String(100), nullable=True)
+    description = db.Column(db.Text, nullable=True)
+    
     created_at = db.Column(
         db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
@@ -33,6 +37,9 @@ class Organization(db.Model):
         return {
             "organization_id": str(self.organization_id),
             "name": self.name,
+            "website": self.website,
+            "country": self.country,
+            "description": self.description,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 

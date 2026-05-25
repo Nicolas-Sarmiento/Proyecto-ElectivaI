@@ -6,6 +6,8 @@ interface PublicationListProps {
   isSemanticSearch: boolean;
   onEdit: (pub: Publication) => void;
   onDelete: (id: string) => void;
+  isAdmin?: boolean;
+  onAuthorClick?: (author: any) => void;
 }
 
 export function PublicationList({
@@ -13,6 +15,8 @@ export function PublicationList({
   isSemanticSearch,
   onEdit,
   onDelete,
+  isAdmin,
+  onAuthorClick,
 }: PublicationListProps) {
   if (publications.length === 0) {
     return (
@@ -39,27 +43,40 @@ export function PublicationList({
                 {pub.title}
               </h3>
               {pub.authors.length > 0 && (
-                <p className="text-sm text-slate-500">
-                  {pub.authors.map((a) => `${a.first_name} ${a.last_name}`).join(', ')}
-                </p>
+                <div className="text-sm text-slate-500 mt-1 flex flex-wrap gap-1">
+                  {pub.authors.map((a, idx) => (
+                    <span key={a.author_id}>
+                      <button
+                        type="button"
+                        onClick={() => onAuthorClick?.(a)}
+                        className="hover:text-blue-600 hover:underline cursor-pointer"
+                      >
+                        {a.first_name} {a.last_name}
+                      </button>
+                      {idx < pub.authors.length - 1 && ', '}
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
-            <div className="flex gap-1 ml-4 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button
-                onClick={() => onEdit(pub)}
-                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                title="Editar"
-              >
-                <Edit2 className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => onDelete(pub.publication_id)}
-                className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                title="Eliminar"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
+            {isAdmin && (
+              <div className="flex gap-1 ml-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  onClick={() => onEdit(pub)}
+                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  title="Editar"
+                >
+                  <Edit2 className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => onDelete(pub.publication_id)}
+                  className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Eliminar"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Similarity score for semantic results */}

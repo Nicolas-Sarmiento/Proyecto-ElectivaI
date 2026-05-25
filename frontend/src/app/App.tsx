@@ -1,9 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, LogOut, User, BookOpen } from 'lucide-react';
 import { LoginForm } from './components/LoginForm';
+import { RegisterForm } from './components/RegisterForm';
 import { PublicationForm } from './components/ArticleForm';
 import { PublicationList } from './components/ArticleList';
 import { SearchPanel } from './components/SearchPanel';
+import { AuthorList } from './components/AuthorList';
+import { OrganizationList } from './components/OrganizationList';
+import { AuthorDetailsModal } from './components/AuthorDetailsModal';
 import {
   isAuthenticated,
   logout,
@@ -22,6 +26,10 @@ export default function App() {
   const [editingPub, setEditingPub] = useState<Publication | null>(null);
   const [searchMode, setSearchMode] = useState<'natural' | 'keyword'>('keyword');
   const [loading, setLoading] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [activeTab, setActiveTab] = useState<'publications' | 'authors' | 'organizations'>('publications');
+  const [selectedAuthor, setSelectedAuthor] = useState<any>(null);
 
   // Cargar publicaciones al inicio
   const loadPublications = useCallback(async () => {
@@ -35,7 +43,11 @@ export default function App() {
     if (loggedIn) {
       loadPublications();
       getMe().then((user) => {
-        if (user) setUserName(user.username || user.email || '');
+        if (user) {
+          setUserName(user.username || user.email || '');
+          const roles = user.roles || [];
+          setIsAdmin(roles.includes('admin') || roles.includes('editorial-admin'));
+        }
       });
     }
   }, [loggedIn, loadPublications]);
@@ -82,9 +94,22 @@ export default function App() {
     setSearchResults(null);
   };
 
-  // Si no está autenticado, mostrar login
+  // Si no está autenticado, mostrar login o registro
   if (!loggedIn) {
-    return <LoginForm onLoginSuccess={() => setLoggedIn(true)} />;
+    if (isRegistering) {
+      return (
+        <RegisterForm
+          onRegisterSuccess={() => setIsRegistering(false)}
+          onBackToLogin={() => setIsRegistering(false)}
+        />
+      );
+    }
+    return (
+      <LoginForm
+        onLoginSuccess={() => setLoggedIn(true)}
+        onGoToRegister={() => setIsRegistering(true)}
+      />
+    );
   }
 
   const displayedPubs = searchResults !== null ? searchResults : publications;
@@ -123,8 +148,32 @@ export default function App() {
       {/* ─── Main content ───────────────────────────────────────── */}
       <div className="max-w-7xl mx-auto px-4 py-8">
 
-        {/* Search section */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+        {/* Tabs */}
+        <div className="flex space-x-4 border-b border-slate-200 mb-8">
+          <button
+            onClick={() => setActiveTab('publications')}
+            className={`py-2 px-4 font-medium border-b-2 transition-colors ${activeTab === 'publications' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          >
+            Publicaciones
+          </button>
+          <button
+            onClick={() => setActiveTab('authors')}
+            className={`py-2 px-4 font-medium border-b-2 transition-colors ${activeTab === 'authors' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          >
+            Autores
+          </button>
+          <button
+            onClick={() => setActiveTab('organizations')}
+            className={`py-2 px-4 font-medium border-b-2 transition-colors ${activeTab === 'organizations' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          >
+            Editoriales
+          </button>
+        </div>
+
+        {activeTab === 'publications' && (
+          <>
+            {/* Search section */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
           <SearchPanel
             searchMode={searchMode}
             onSearchModeChange={setSearchMode}
@@ -149,13 +198,15 @@ export default function App() {
               </p>
             )}
           </div>
-          <button
-            onClick={() => setIsFormOpen(true)}
-            className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-5 py-2.5 rounded-xl hover:from-blue-500 hover:to-indigo-500 transition-all shadow-md shadow-blue-500/20 hover:shadow-blue-500/30"
-          >
-            <Plus className="w-5 h-5" />
-            Nueva Publicación
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setIsFormOpen(true)}
+              className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-5 py-2.5 rounded-xl hover:from-blue-500 hover:to-indigo-500 transition-all shadow-md shadow-blue-500/20 hover:shadow-blue-500/30"
+            >
+              <Plus className="w-5 h-5" />
+              Nueva Publicación
+            </button>
+          )}
         </div>
 
         {/* Publication list */}
@@ -170,8 +221,21 @@ export default function App() {
             isSemanticSearch={isSemanticResults}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            isAdmin={isAdmin}
+            onAuthorClick={setSelectedAuthor}
           />
+          )}
+          </>
         )}
+
+        {activeTab === 'authors' && (
+          <AuthorList isAdmin={isAdmin} />
+        )}
+
+        {activeTab === 'organizations' && (
+          <OrganizationList isAdmin={isAdmin} />
+        )}
+
       </div>
 
       {/* ─── Publication Form Modal ────────────────────────────── */}
@@ -182,9 +246,21 @@ export default function App() {
               publication={editingPub}
               onSuccess={handleFormSuccess}
               onCancel={handleFormClose}
+              isAdmin={isAdmin}
             />
           </div>
         </div>
+      )}
+
+      {/* ─── Author Details Modal ────────────────────────────── */}
+      {selectedAuthor && (
+        <AuthorDetailsModal
+          author={selectedAuthor}
+          onClose={() => setSelectedAuthor(null)}
+          isAdmin={isAdmin}
+          onEditPublication={handleEdit}
+          onDeletePublication={handleDelete}
+        />
       )}
     </div>
   );

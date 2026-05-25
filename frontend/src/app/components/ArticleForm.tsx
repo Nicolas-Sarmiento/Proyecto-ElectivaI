@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { X, Upload, Loader2 } from 'lucide-react';
+import { X, Upload, Loader2, Plus } from 'lucide-react';
 import {
   createPublication,
   updatePublication,
   getAuthors,
   getPublicationTypes,
+  createAuthor,
+  createPublicationType,
   type Publication,
   type Author,
   type PublicationType,
@@ -14,13 +16,15 @@ interface PublicationFormProps {
   publication?: Publication | null;
   onSuccess: () => void;
   onCancel: () => void;
+  isAdmin?: boolean;
 }
 
-export function PublicationForm({ publication, onSuccess, onCancel }: PublicationFormProps) {
+export function PublicationForm({ publication, onSuccess, onCancel, isAdmin }: PublicationFormProps) {
   const [title, setTitle] = useState('');
   const [typeId, setTypeId] = useState('');
   const [publishDate, setPublishDate] = useState('');
-  const [keywordsText, setKeywordsText] = useState('');
+  const [keywordsList, setKeywordsList] = useState<string[]>([]);
+  const [keywordInput, setKeywordInput] = useState('');
   const [selectedAuthors, setSelectedAuthors] = useState<string[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -43,7 +47,7 @@ export function PublicationForm({ publication, onSuccess, onCancel }: Publicatio
           ? publication.publish_date.split('T')[0]
           : ''
       );
-      setKeywordsText((publication.keywords || []).join(', '));
+      setKeywordsList(publication.keywords || []);
       setSelectedAuthors(publication.authors.map((a) => a.author_id));
     }
   }, [publication]);
@@ -58,11 +62,11 @@ export function PublicationForm({ publication, onSuccess, onCancel }: Publicatio
     if (typeId) formData.append('type_id', typeId);
     if (publishDate) formData.append('publish_date', publishDate);
 
-    const keywords = keywordsText
-      .split(',')
-      .map((k) => k.trim())
-      .filter(Boolean);
-    keywords.forEach((kw) => formData.append('keywords', kw));
+    const finalKeywords = [...keywordsList];
+    if (keywordInput.trim() && !finalKeywords.includes(keywordInput.trim())) {
+      finalKeywords.push(keywordInput.trim());
+    }
+    finalKeywords.forEach((kw) => formData.append('keywords', kw));
 
     selectedAuthors.forEach((id) => formData.append('author_ids', id));
 
@@ -92,6 +96,53 @@ export function PublicationForm({ publication, onSuccess, onCancel }: Publicatio
     setSelectedAuthors((prev) =>
       prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]
     );
+  };
+
+  const handleKeywordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      const val = keywordInput.trim();
+      if (val && !keywordsList.includes(val)) {
+        setKeywordsList([...keywordsList, val]);
+      }
+      setKeywordInput('');
+    }
+  };
+
+  const removeKeyword = (kwToRemove: string) => {
+    setKeywordsList(keywordsList.filter(k => k !== kwToRemove));
+  };
+
+  const handleCreateAuthor = async () => {
+    const firstName = window.prompt("Nombre del autor:");
+    if (!firstName) return;
+    const lastName = window.prompt("Apellido del autor:");
+    if (!lastName) return;
+
+    setLoading(true);
+    const result = await createAuthor({ first_name: firstName, last_name: lastName });
+    if (result.ok && result.data) {
+      getAuthors().then(setAuthors);
+      setSelectedAuthors(prev => [...prev, result.data!.author_id]);
+    } else {
+      alert(result.error);
+    }
+    setLoading(false);
+  };
+
+  const handleCreateType = async () => {
+    const typeName = window.prompt("Nombre del nuevo tipo de publicación:");
+    if (!typeName) return;
+
+    setLoading(true);
+    const result = await createPublicationType({ type_name: typeName });
+    if (result.ok && result.data) {
+      getPublicationTypes().then(setPubTypes);
+      setTypeId(result.data.type_id);
+    } else {
+      alert(result.error);
+    }
+    setLoading(false);
   };
 
   return (
@@ -132,9 +183,20 @@ export function PublicationForm({ publication, onSuccess, onCancel }: Publicatio
         <div className="grid grid-cols-2 gap-4">
           {/* Tipo de publicación */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Tipo de Publicación
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-slate-700">
+                Tipo de Publicación
+              </label>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={handleCreateType}
+                  className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium bg-blue-50 px-2 py-0.5 rounded-md"
+                >
+                  <Plus className="w-3 h-3" /> Nuevo
+                </button>
+              )}
+            </div>
             <select
               value={typeId}
               onChange={(e) => setTypeId(e.target.value)}
@@ -166,22 +228,44 @@ export function PublicationForm({ publication, onSuccess, onCancel }: Publicatio
         {/* Keywords */}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">
-            Palabras Clave (separadas por coma)
+            Palabras Clave (Presiona Enter para agregar)
           </label>
+          <div className="flex flex-wrap gap-2 mb-2">
+            {keywordsList.map(kw => (
+              <span key={kw} className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1 rounded-full text-sm">
+                {kw}
+                <button type="button" onClick={() => removeKeyword(kw)} className="hover:text-indigo-900">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+          </div>
           <input
             type="text"
-            value={keywordsText}
-            onChange={(e) => setKeywordsText(e.target.value)}
-            placeholder="machine learning, redes neuronales, IA"
+            value={keywordInput}
+            onChange={(e) => setKeywordInput(e.target.value)}
+            onKeyDown={handleKeywordKeyDown}
+            placeholder="Añadir palabra clave..."
             className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50"
           />
         </div>
 
         {/* Autores */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
-            Autores
-          </label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-sm font-medium text-slate-700">
+              Autores
+            </label>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={handleCreateAuthor}
+                className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium bg-blue-50 px-2 py-0.5 rounded-md"
+              >
+                <Plus className="w-3 h-3" /> Nuevo Autor
+              </button>
+            )}
+          </div>
           {authors.length === 0 ? (
             <p className="text-sm text-slate-400 italic">
               No hay autores registrados.
