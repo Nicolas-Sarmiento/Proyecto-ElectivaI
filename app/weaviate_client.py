@@ -3,20 +3,36 @@ import weaviate.classes.config as wvcc
 from flask import current_app
 
 def get_weaviate_client():
-    """Conecta al cliente de Weaviate usando la configuración de Flask."""
-    host = current_app.config.get('WEAVIATE_HOST', 'localhost')
-    port = current_app.config.get('WEAVIATE_PORT', 8080)
-    grpc_port = current_app.config.get('WEAVIATE_GRPC_PORT', 50051)
+    """Conecta al cluster de Weaviate Cloud (WCD)."""
     
-    return weaviate.connect_to_local(
-        host=host,
-        port=port,
-        grpc_port=grpc_port
+    # URL completa (ej. https://xxx.weaviate.network)
+    weaviate_url = current_app.config.get('WEAVIATE_URL')
+    
+    # API KEY de tu cluster Weaviate
+    weaviate_api_key = current_app.config.get('WEAVIATE_API_KEY')
+    
+    # API KEY para vectorizar el texto con Hugging Face
+    huggingface_api_key = current_app.config.get('HUGGINGFACE_API_KEY')
+
+    # Headers necesarios para que Weaviate envíe el texto a HuggingFace
+    headers = {}
+    if huggingface_api_key:
+        headers["X-HuggingFace-Api-Key"] = huggingface_api_key
+
+    return weaviate.connect_to_weaviate_cloud(
+        cluster_url=weaviate_url,
+        auth_credentials=weaviate.auth.AuthApiKey(weaviate_api_key),
+        headers=headers
     )
 
 def inicializar_weaviate(app):
-    """Inicializa la colección Publication en Weaviate."""
+    """Inicializa la colección Publication en Weaviate Cloud."""
     with app.app_context():
+        # Verificamos si tenemos creedenciales mínimas antes de conectar
+        if not app.config.get('WEAVIATE_URL') or not app.config.get('WEAVIATE_API_KEY'):
+            print("Weaviate URL o API KEY ausentes en .env. Omitiendo inicialización.")
+            return
+
         try:
             client = get_weaviate_client()
             
@@ -24,7 +40,8 @@ def inicializar_weaviate(app):
                 client.collections.create(
                     name="Publication",
                     description="Colección de publicaciones académicas",
-                    vectorizer_config=wvcc.Configure.Vectorizer.text2vec_transformers(),
+                    # Cambiamos OpenAI por HuggingFace
+                    vectorizer_config=wvcc.Configure.Vectorizer.text2vec_huggingface(),
                     properties=[
                         wvcc.Property(name="publication_id", data_type=wvcc.DataType.TEXT),
                         wvcc.Property(name="title", data_type=wvcc.DataType.TEXT),
@@ -32,21 +49,20 @@ def inicializar_weaviate(app):
                         wvcc.Property(name="keywords", data_type=wvcc.DataType.TEXT_ARRAY),
                     ]
                 )
-                print("Colección 'Publication' creada en Weaviate.")
+                print(" Colección 'Publication' creada en Weaviate Cloud.")
             else:
-                print("Colección 'Publication' ya existe en Weaviate.")
+                print("Colección 'Publication' detectada en Weaviate Cloud.")
                 
             client.close()
         except Exception as e:
-            print(f"Error inicializando Weaviate: {e}")
+            print(f" Error inicializando Weaviate Cloud: {e}")
 
 def guardar_publicacion(publication_id, title, resource_url, keywords):
-    """Guarda/Sincroniza una publicación hacia Weaviate."""
+    """Guarda/Sincroniza una publicación hacia Weaviate Cloud."""
     try:
         client = get_weaviate_client()
         coleccion = client.collections.get("Publication")
         
-        # En Weaviate generamos el uuid o usamos insert
         coleccion.data.insert({
             "publication_id": str(publication_id),
             "title": title,
@@ -56,10 +72,10 @@ def guardar_publicacion(publication_id, title, resource_url, keywords):
         
         client.close()
     except Exception as e:
-        print(f"Error sincronizando con Weaviate: {e}")
+        print(f"Error sincronizando con Weaviate Cloud: {e}")
 
 def buscar_publicaciones(query: str, limite: int = 5):
-    """Realiza una Búsqueda Híbrida en las publicaciones."""
+    """Realiza una Búsqueda Híbrida en Weaviate Cloud."""
     try:
         client = get_weaviate_client()
         coleccion = client.collections.get("Publication")
@@ -82,5 +98,5 @@ def buscar_publicaciones(query: str, limite: int = 5):
         client.close()
         return resultados
     except Exception as e:
-        print(f"Error buscando en Weaviate: {e}")
+        print(f"Error buscando en Weaviate Cloud: {e}")
         return []

@@ -18,8 +18,7 @@ class Config:
         f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    
-    # Weaviate Configuration
-    WEAVIATE_HOST = os.getenv("WEAVIATE_HOST", "localhost")
-    WEAVIATE_PORT = int(os.getenv("WEAVIATE_PORT", "8080"))
-    WEAVIATE_GRPC_PORT = int(os.getenv("WEAVIATE_GRPC_PORT", "50051"))
+    # Weaviate Cloud Configuration
+    WEAVIATE_URL = os.getenv("WEAVIATE_URL")
+    WEAVIATE_API_KEY = os.getenv("WEAVIATE_API_KEY")
+    HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
