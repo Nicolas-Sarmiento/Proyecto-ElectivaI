@@ -25,7 +25,7 @@ class Config:
     ALLOWED_EXTENSIONS = {"pdf"}
 
     # Keycloak — validación de Bearer tokens
-    KEYCLOAK_URL = os.getenv("KEYCLOAK_URL", "http://localhost:8080")
+    KEYCLOAK_URL = os.getenv("KEYCLOAK_URL", "http://localhost:8082")
     KEYCLOAK_REALM = os.getenv("KEYCLOAK_REALM", "editorial")
     KEYCLOAK_CLIENT_ID = os.getenv("KEYCLOAK_CLIENT_ID", "editorial-backend")
     KEYCLOAK_CLIENT_SECRET = os.getenv("KEYCLOAK_CLIENT_SECRET", "")

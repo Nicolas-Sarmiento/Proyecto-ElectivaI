@@ -9,3 +9,4 @@ instance/
 .vscode/
 node_modules/
 
+uploads/

@@ -2,30 +2,55 @@ import os
 import re
 import math
 import argparse
+import uuid
 from datetime import timezone
 from app import create_app
 from app.models import db, Publication, Author, PublicationType
 from app.embeddings import semantic_search
-from populate_db import populate_from_arxiv
 
 app = create_app()
 
-# Definición de Queries de Prueba y sus reglas de relevancia heurísticas
+# Definición de 10 Queries de Prueba Diversas y sus reglas de relevancia heurísticas
 TEST_QUERIES = [
     {
         "query": "neural networks for computer vision and image classification",
         "keywords": ["vision", "image", "classification", "cnn", "convolutional", "object", "detection", "cs.CV"],
-        "category": "computer_vision"
     },
     {
         "query": "natural language processing and transformer models",
         "keywords": ["language", "nlp", "text", "transformer", "bert", "gpt", "translation", "cs.CL", "attention"],
-        "category": "nlp"
     },
     {
         "query": "optimization algorithms and gradient descent",
         "keywords": ["optimization", "gradient", "descent", "sgd", "optimizer", "convex", "cs.LG", "stat.ML"],
-        "category": "optimization"
+    },
+    {
+        "query": "quantum computing qubits and entanglement",
+        "keywords": ["quantum", "qubits", "entanglement", "trapped ion"],
+    },
+    {
+        "query": "cancer treatments immunotherapy and oncology",
+        "keywords": ["cancer", "immunotherapy", "oncology", "tumor"],
+    },
+    {
+        "query": "CRISPR gene editing technology in biology",
+        "keywords": ["crispr", "gene editing", "cas9", "disorders"],
+    },
+    {
+        "query": "prime numbers cryptography and security",
+        "keywords": ["prime numbers", "cryptography", "elliptic curves", "security"],
+    },
+    {
+        "query": "exoplanets stellar atmospheres and space exploration",
+        "keywords": ["exoplanet", "stellar", "astronomy", "atmosphere", "space"],
+    },
+    {
+        "query": "biodiversity climate change impact on ecosystems",
+        "keywords": ["biodiversity", "climate change", "ecology", "ecosystem", "fauna"],
+    },
+    {
+        "query": "polymers biodegradation and green chemistry synthesis",
+        "keywords": ["polymer", "biodegradable", "green chemistry"],
     }
 ]
 
@@ -105,7 +130,6 @@ def calculate_ndcg(results, relevant_ids, k=5):
     dcg = 0.0
     for idx, r in enumerate(top_k_results):
         if uuid.UUID(r["publication_id"]) in relevant_ids:
-            # Relevancia binaria (1 si es relevante, 0 si no)
             dcg += 1.0 / math.log2(idx + 2)
             
     # Calcular IDCG (Ideal DCG)
@@ -119,21 +143,16 @@ def calculate_ndcg(results, relevant_ids, k=5):
         
     return dcg / idcg
 
-import uuid
-
 def evaluate():
     with app.app_context():
         publications = Publication.query.all()
         
-        # Si no hay suficientes publicaciones, poblamos automáticamente
-        if len(publications) < 10:
+        # Si no hay suficientes publicaciones, poblamos automáticamente usando el generador local
+        if len(publications) < 30:
             print(f"Base de datos casi vacía ({len(publications)} publicaciones).")
-            print("Poblando automáticamente con papers de ArXiv para la evaluación...")
-            
-            # Descargamos 4 papers de cada categoría para tener variedad
-            populate_from_arxiv(query="computer vision", max_results=4)
-            populate_from_arxiv(query="natural language processing", max_results=4)
-            populate_from_arxiv(query="machine learning optimization", max_results=4)
+            print("Poblando automáticamente con el dataset sintético extendido local...")
+            from populate_db import generate_synthetic_pdfs
+            generate_synthetic_pdfs(clear_db=True)
             
             # Recargar
             publications = Publication.query.all()
@@ -148,9 +167,9 @@ def evaluate():
         
         num_queries = len(TEST_QUERIES)
         
-        print("\n" + "="*80)
-        print(f"{'QUERY EVALUADA':<50} | {'KW REL':<6} | {'SEM REL':<6}")
-        print("="*80)
+        print("\n" + "="*95)
+        print(f"{'QUERY EVALUADA':<55} | {'KW REL':<6} | {'SEM REL':<6} | {'TOTAL REL':<9}")
+        print("="*95)
         
         for q_data in TEST_QUERIES:
             query = q_data["query"]
@@ -189,8 +208,8 @@ def evaluate():
             kw_ret_rel = sum(1 for r in kw_results[:5] if uuid.UUID(r["publication_id"]) in relevant_ids)
             sem_ret_rel = sum(1 for r in sem_results[:5] if uuid.UUID(r["publication_id"]) in relevant_ids)
             
-            short_query = query[:47] + "..." if len(query) > 50 else query
-            print(f"{short_query:<50} | {kw_ret_rel}/{len(relevant_ids):<4} | {sem_ret_rel}/{len(relevant_ids):<4}")
+            short_query = query[:52] + "..." if len(query) > 55 else query
+            print(f"{short_query:<55} | {kw_ret_rel:<6} | {sem_ret_rel:<6} | {len(relevant_ids):<9}")
             
         if num_queries == 0:
             print("No se pudieron evaluar queries debido a falta de datos relevantes.")
